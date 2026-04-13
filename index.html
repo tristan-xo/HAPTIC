@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Haptic Showroom — Virtual Try-Before-You-Buy</title>
+  <meta name="description" content="AI-powered haptic virtual showroom. Interact with 3D products using hand gestures via your webcam." />
+
+  <!-- MediaPipe CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════
+       HEADER
+  ═══════════════════════════════════════ -->
+  <header class="header">
+    <div class="header__logo">
+      <span class="header__diamond">◈</span>
+      <div>
+        <div class="header__title">HAPTIC SHOWROOM</div>
+        <div class="header__sub">Virtual Try-Before-You-Buy</div>
+      </div>
+    </div>
+
+    <div class="header__status">
+      <div class="header__live-dot" id="liveDot"></div>
+      <span class="header__live-label" id="liveLabel">INITIALIZING</span>
+    </div>
+
+    <div class="header__controls">
+      <button class="btn-icon" id="btnCamera" title="Toggle Camera">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M15 10l4.553-2.069A1 1 0 0121 8.867v6.266a1 1 0 01-1.447.902L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+        </svg>
+      </button>
+      <button class="btn-icon" id="btnReset" title="Reset Rotation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════
+       MAIN LAYOUT
+  ═══════════════════════════════════════ -->
+  <main class="layout">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+      <div class="sidebar__label">COLLECTION</div>
+      <div class="sidebar__count" id="collectionCount">2 Products</div>
+
+      <div class="product-list" id="productList">
+        <!-- Injected by JS -->
+      </div>
+
+      <div class="sidebar__gesture-guide">
+        <div class="guide__title">GESTURE GUIDE</div>
+        <div class="guide__item">
+          <span class="guide__icon fist-icon"></span>
+          <span>Fist → Grab mode</span>
+        </div>
+        <div class="guide__item">
+          <span class="guide__icon pinch-icon"></span>
+          <span>Pinch → Select product</span>
+        </div>
+        <div class="guide__item">
+          <span class="guide__icon open-icon"></span>
+          <span>Open → Release</span>
+        </div>
+        <div class="guide__item">
+          <span class="guide__icon hands-icon"></span>
+          <span>Both hands → Full 3D</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── 3D VIEWER ── -->
+    <section class="viewer">
+      <div class="viewer__header">
+        <div>
+          <span class="viewer__title">3D PREVIEW</span>
+          <div class="viewer__title-line"></div>
+        </div>
+        <div class="viewer__hand-status" id="handStatus">
+          <span class="hand-dot" id="handDot"></span>
+          <span id="handStatusText">NO HANDS DETECTED</span>
+        </div>
+      </div>
+
+      <!-- Canvas layers -->
+      <div class="viewer__canvas-wrap">
+        <canvas id="videoCanvas" class="viewer__canvas viewer__canvas--video"></canvas>
+        <canvas id="overlayCanvas" class="viewer__canvas viewer__canvas--overlay"></canvas>
+        <canvas id="productCanvas" class="viewer__canvas viewer__canvas--product"></canvas>
+
+        <!-- Particle canvas -->
+        <canvas id="particleCanvas" class="viewer__canvas viewer__canvas--particles"></canvas>
+
+        <!-- Cursor -->
+        <div class="cursor" id="cursor"></div>
+
+        <!-- Camera off overlay -->
+        <div class="viewer__nocam" id="noCamOverlay">
+          <div class="viewer__nocam-inner">
+            <div class="viewer__nocam-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                <path d="M15 10l4.553-2.069A1 1 0 0121 8.867v6.266a1 1 0 01-1.447.902L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+              </svg>
+            </div>
+            <p class="viewer__nocam-title">Camera not active</p>
+            <p class="viewer__nocam-sub">Click the camera button in the header to start<br>or allow camera access when prompted</p>
+            <button class="btn-primary" id="btnStartCamera">Enable Camera</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Viewer footer -->
+      <div class="viewer__footer">
+        <div class="viewer__angles" id="viewerAngles">X:0° Y:0° Z:0°</div>
+        <div class="viewer__squeeze" id="viewerSqueeze"></div>
+      </div>
+    </section>
+
+    <!-- ── INFO PANEL ── -->
+    <aside class="info-panel" id="infoPanel">
+
+      <!-- Product title block -->
+      <div class="info__section">
+        <div class="info__section-label">PRODUCT DETAILS</div>
+        <h2 class="info__product-name" id="infoName">—</h2>
+        <div class="info__brand" id="infoBrand">—</div>
+        <div class="info__stars" id="infoStars"></div>
+        <div class="info__price-row">
+          <span class="info__price" id="infoPrice">—</span>
+          <span class="info__original-price" id="infoOriginalPrice"></span>
+          <span class="info__discount badge" id="infoDiscount"></span>
+        </div>
+        <div class="info__badges">
+          <span class="badge badge--prime" id="infoPrime" style="display:none">PRIME</span>
+          <span class="info__stock" id="infoStock"></span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Haptic properties -->
+      <div class="info__section">
+        <div class="info__section-label">HAPTIC PROPERTIES</div>
+        <div class="gauges-row">
+          <div class="gauge" id="gaugeRough">
+            <canvas class="gauge__canvas" width="64" height="64" data-key="roughness"></canvas>
+            <div class="gauge__val" id="gaugeRoughVal">0</div>
+            <div class="gauge__label">ROUGH</div>
+          </div>
+          <div class="gauge" id="gaugeBounce">
+            <canvas class="gauge__canvas" width="64" height="64" data-key="elasticity"></canvas>
+            <div class="gauge__val" id="gaugeBounceVal">0</div>
+            <div class="gauge__label">BOUNCE</div>
+          </div>
+          <div class="gauge" id="gaugeSqueeze">
+            <canvas class="gauge__canvas" width="64" height="64" data-key="squeeze"></canvas>
+            <div class="gauge__val" id="gaugeSqueezeVal">0</div>
+            <div class="gauge__label">SQUEEZE</div>
+          </div>
+        </div>
+
+        <!-- Waveform -->
+        <div class="info__section-label" style="margin-top:14px">HAPTIC WAVEFORM</div>
+        <canvas id="waveformCanvas" width="260" height="44" class="waveform-canvas"></canvas>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Gesture status -->
+      <div class="info__section">
+        <div class="info__section-label">GESTURE CONTROL</div>
+        <div class="gesture-row">
+          <span class="gesture-name" id="gestureName">NO HAND</span>
+          <span class="gesture-desc" id="gestureDesc">Show your hand</span>
+        </div>
+        <div class="confidence-row">
+          <span class="conf-label">TRACKING</span>
+          <div class="conf-bar-wrap">
+            <div class="conf-bar" id="confBar"></div>
+          </div>
+          <span class="conf-pct" id="confPct">0%</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Session insights -->
+      <div class="info__section">
+        <div class="info__section-label">SESSION INSIGHTS</div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-card__val" id="statInteractions">0</div>
+            <div class="stat-card__label">interactions</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__val" id="statViewTime">0s</div>
+            <div class="stat-card__label">view time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__val" id="statMaxSqueeze">0%</div>
+            <div class="stat-card__label">max squeeze</div>
+          </div>
+        </div>
+
+        <!-- Rotating tip -->
+        <div class="tip-bar" id="tipBar">
+          <div class="tip-bar__line"></div>
+          <span class="tip-bar__text" id="tipText">Tip: Use both hands for full 3D rotation</span>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="divider"></div>
+      <div class="info__section">
+        <div class="info__section-label">ABOUT THIS ITEM</div>
+        <p class="info__desc" id="infoDesc">—</p>
+        <ul class="info__features" id="infoFeatures"></ul>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- ═══════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="footer__fps" id="footerFPS">FPS —</div>
+    <div class="footer__product" id="footerProduct">No product selected</div>
+    <div class="footer__mark">◈ HAPTIC SHOWROOM v6</div>
+    <div class="footer__keys">
+      <kbd>S</kbd> Switch &nbsp;
+      <kbd>R</kbd> Reset
+    </div>
+  </footer>
+
+  <!-- Hidden video element for camera feed -->
+  <video id="hiddenVideo" style="display:none" playsinline></video>
+
+  <script src="app.js"></script>
+</body>
+</html>
